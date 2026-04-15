@@ -1,33 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DRC Flood & Health Infrastructure Risk Map</title>
+    <title>DRC Health Facility Flood Risk Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 600px; width: 100%; }
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .legend { background: white; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .legend { background: white; padding: 10px; border: 1px solid #ccc; border-radius: 5px; line-height: 1.5; }
         .legend i { width: 10px; height: 10px; display: inline-block; border-radius: 50%; margin-right: 5px; }
+        .controls { margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd; }
+        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button.active { background: #dc3545; }
     </style>
 </head>
 <body>
-    <h1>DRC Flood Risk Map (1km Radius Analysis)</h1>
-    <p>This map identifies <b>19 health sites</b> located within 1km of recorded flood events.</p>
+    <h1>DRC Health Facilities: Flood Risk Analysis</h1>
     
+    <div class="controls">
+        <strong>Map Filters:</strong> 
+        <button id="showAll" onclick="filterMap('all')">Show All Health Sites</button>
+        <button id="showRisk" onclick="filterMap('risk')" style="background:#ff00ff">Show ONLY Sites at Risk (1km)</button>
+    </div>
+
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Initialize map
         var map = L.map('map').setView([-4.038, 21.758], 5);
-
-        // 2. Add tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        function createMarker(lat, lng, color, radius, opacity, popupText) {
+        // Layer Groups to allow easy filtering
+        var floodLayer = L.layerGroup().addTo(map);
+        var allHealthLayer = L.layerGroup().addTo(map);
+        var riskLayer = L.layerGroup().addTo(map);
+
+        function createMarker(lat, lng, color, radius, opacity, popupText, layer) {
             return L.circleMarker([lat, lng], {
                 radius: radius,
                 fillColor: color,
@@ -35,22 +46,21 @@
                 weight: 1,
                 opacity: 1,
                 fillOpacity: opacity
-            }).addTo(map).bindPopup(popupText);
+            }).addTo(layer).bindPopup(popupText);
         }
 
-        // 3. Load All Floods (Blue)
+        // 1. Load All Floods
         fetch('drc_floods.json')
             .then(response => response.json())
             .then(data => {
                 data.forEach(flood => {
                     if (flood.lat && flood.long) {
-                        var popup = "<b>Flood Event</b><br>Date: " + (flood.Began || 'N/A');
-                        createMarker(flood.lat, flood.long, "#3388ff", 8, 0.4, popup);
+                        createMarker(flood.lat, flood.long, "#3388ff", 8, 0.4, "<b>Flood Event</b><br>Date: " + flood.Began, floodLayer);
                     }
                 });
             });
 
-        // 4. Load General Health Sites (Small Grey circles)
+        // 2. Load All Health Sites
         fetch('drc_health_infrastructure.json')
             .then(response => response.json())
             .then(data => {
@@ -60,12 +70,12 @@
                     if (lat && lon) {
                         var tags = site.tags || {};
                         var popup = "<b>" + (tags.name || "Unnamed Site") + "</b><br>Type: " + tags.amenity;
-                        createMarker(lat, lon, "#888888", 3, 0.2, popup);
+                        createMarker(lat, lon, "#888888", 4, 0.3, popup, allHealthLayer);
                     }
                 });
             });
 
-        // 5. Load AT-RISK Health Sites (Highlight in Magenta/Pink)
+        // 3. Load At-Risk Sites
         fetch('sites_at_risk.json')
             .then(response => response.json())
             .then(data => {
@@ -74,27 +84,43 @@
                     var lon = site.lon || (site.center ? site.center.lon : null);
                     if (lat && lon) {
                         var tags = site.tags || {};
-                        var popup = "<b><span style='color:red'>⚠️ SITE AT RISK</span></b><br>" +
+                        var popup = "<b><span style='color:red'>⚠️ AT RISK (within 1km)</span></b><br>" +
                                    "<b>Name:</b> " + (tags.name || "Unnamed") + "<br>" +
-                                   "<b>Type:</b> " + tags.amenity + "<br>" +
-                                   "<b>Distance to Flood:</b> " + tags.distance_to_flood + " km<br>" +
-                                   "<b>Associated Event:</b> " + (tags.flood_event || "N/A");
-                        createMarker(lat, lon, "#ff00ff", 8, 1, popup);
+                                   "<b>Distance:</b> " + tags.distance_to_flood + " km";
+                        createMarker(lat, lon, "#ff00ff", 8, 1, popup, riskLayer);
                     }
                 });
             });
 
-        // 6. Legend
+        // 4. Filter Logic
+        function filterMap(mode) {
+            if (mode === 'risk') {
+                map.removeLayer(allHealthLayer); // Hide normal sites
+                map.addLayer(riskLayer);         // Ensure risk sites are visible
+                document.getElementById('showRisk').classList.add('active');
+                document.getElementById('showAll').classList.remove('active');
+            } else {
+                map.addLayer(allHealthLayer);    // Show all sites
+                map.addLayer(riskLayer);         // Keep risk sites visible too
+                document.getElementById('showAll').classList.add('active');
+                document.getElementById('showRisk').classList.remove('active');
+            }
+        }
+
+        // 5. Legend
         var legend = L.control({position: 'bottomright'});
         legend.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'legend');
-            div.innerHTML += '<b>Legend</b><br>';
-            div.innerHTML += '<i style="background: #ff00ff"></i> <b>At-Risk Site (within 1km)</b><br>';
+            div.innerHTML += '<b>Map Key</b><br>';
+            div.innerHTML += '<i style="background: #ff00ff"></i> <b>At-Risk Health Site</b><br>';
             div.innerHTML += '<i style="background: #3388ff"></i> Recorded Flood<br>';
-            div.innerHTML += '<i style="background: #888888"></i> Other Health Site<br>';
+            div.innerHTML += '<i style="background: #888888"></i> Normal Health Site<br>';
             return div;
         };
         legend.addTo(map);
+
+        // Default view: Show All
+        filterMap('all');
 
     </script>
 </body>
