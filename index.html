@@ -12,6 +12,18 @@
         button { padding: 8px 15px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; }
         button:hover { background: #0056b3; }
         button.active { background: #dc3545; }
+
+        /* PULSING ANIMATION FOR RISK SITES */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .pulse-marker {
+            animation: pulse 1.5s infinite ease-in-out;
+            transform-origin: center;
+        }
     </style>
 </head>
 <body>
@@ -33,20 +45,13 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Layer Groups to allow easy filtering
         var floodLayer = L.layerGroup().addTo(map);
         var allHealthLayer = L.layerGroup().addTo(map);
         var riskLayer = L.layerGroup().addTo(map);
 
-        function createMarker(lat, lng, color, radius, opacity, popupText, layer) {
-            return L.circleMarker([lat, lng], {
-                radius: radius,
-                fillColor: color,
-                color: "#000",
-                weight: 1,
-                opacity: 1,
-                fillOpacity: opacity
-            }).addTo(layer).bindPopup(popupText);
+        // Helper to create circle markers
+        function createMarker(lat, lng, options, popupText, layer) {
+            return L.circleMarker([lat, lng], options).addTo(layer).bindPopup(popupText);
         }
 
         // 1. Load All Floods
@@ -55,7 +60,9 @@
             .then(data => {
                 data.forEach(flood => {
                     if (flood.lat && flood.long) {
-                        createMarker(flood.lat, flood.long, "#3388ff", 8, 0.4, "<b>Flood Event</b><br>Date: " + flood.Began, floodLayer);
+                        createMarker(flood.lat, flood.long, {
+                            radius: 8, fillColor: "#3388ff", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.4
+                        }, "<b>Flood Event</b><br>Date: " + flood.Began, floodLayer);
                     }
                 });
             });
@@ -70,12 +77,14 @@
                     if (lat && lon) {
                         var tags = site.tags || {};
                         var popup = "<b>" + (tags.name || "Unnamed Site") + "</b><br>Type: " + tags.amenity;
-                        createMarker(lat, lon, "#888888", 4, 0.3, popup, allHealthLayer);
+                        createMarker(lat, lon, {
+                            radius: 4, fillColor: "#888888", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.3
+                        }, popup, allHealthLayer);
                     }
                 });
             });
 
-        // 3. Load At-Risk Sites
+        // 3. Load At-Risk Sites with ANIMATION
         fetch('sites_at_risk.json')
             .then(response => response.json())
             .then(data => {
@@ -87,41 +96,47 @@
                         var popup = "<b><span style='color:red'>⚠️ AT RISK (within 1km)</span></b><br>" +
                                    "<b>Name:</b> " + (tags.name || "Unnamed") + "<br>" +
                                    "<b>Distance:</b> " + tags.distance_to_flood + " km";
-                        createMarker(lat, lon, "#ff00ff", 8, 1, popup, riskLayer);
+                        
+                        // We add 'className: "pulse-marker"' to trigger the CSS animation
+                        createMarker(lat, lon, {
+                            radius: 10, 
+                            fillColor: "#ff00ff", 
+                            color: "#000", 
+                            weight: 2, 
+                            opacity: 1, 
+                            fillOpacity: 1,
+                            className: "pulse-marker" 
+                        }, popup, riskLayer);
                     }
                 });
             });
 
-        // 4. Filter Logic
         function filterMap(mode) {
             if (mode === 'risk') {
-                map.removeLayer(allHealthLayer); // Hide normal sites
-                map.addLayer(riskLayer);         // Ensure risk sites are visible
+                map.removeLayer(allHealthLayer);
+                map.addLayer(riskLayer);
                 document.getElementById('showRisk').classList.add('active');
                 document.getElementById('showAll').classList.remove('active');
             } else {
-                map.addLayer(allHealthLayer);    // Show all sites
-                map.addLayer(riskLayer);         // Keep risk sites visible too
+                map.addLayer(allHealthLayer);
+                map.addLayer(riskLayer);
                 document.getElementById('showAll').classList.add('active');
                 document.getElementById('showRisk').classList.remove('active');
             }
         }
 
-        // 5. Legend
         var legend = L.control({position: 'bottomright'});
         legend.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<b>Map Key</b><br>';
-            div.innerHTML += '<i style="background: #ff00ff"></i> <b>At-Risk Health Site</b><br>';
+            div.innerHTML += '<i style="background: #ff00ff; border: 2px solid black;"></i> <b>Warning: At-Risk Site</b><br>';
             div.innerHTML += '<i style="background: #3388ff"></i> Recorded Flood<br>';
             div.innerHTML += '<i style="background: #888888"></i> Normal Health Site<br>';
             return div;
         };
         legend.addTo(map);
 
-        // Default view: Show All
         filterMap('all');
-
     </script>
 </body>
 </html>
