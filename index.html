@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DRC Flood Map</title>
+    <!-- 1. Leaflet CSS (The 'style' for our map) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 600px; width: 100%; }
+        body { font-family: Arial, sans-serif; }
+    </style>
+</head>
+<body>
+    <h1>DRC Flood Archive Map</h1>
+    <p>This map shows flood locations in the Democratic Republic of the Congo.</p>
+    
+    <!-- 2. The container for our map -->
+    <div id="map"></div>
+
+    <!-- 3. Leaflet JS (The 'brains' of our map) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 4. Initialize the map centered on the DRC
+        var map = L.map('map').setView([-4.038, 21.758], 5);
+
+        // 5. Add a base layer (The background tiles)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 6. Load the data (Replace 'drc_floods.json' with your GitHub RAW link later)
+        fetch('drc_floods.json')
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(flood => {
+                    // Check if we have valid coordinates
+                    if (flood.lat && flood.long) {
+                        // Create a marker for each flood
+                        var marker = L.marker([flood.lat, flood.long]).addTo(map);
+                        
+                        // Add a popup with info
+                        marker.bindPopup(
+                            "<b>ID:</b> " + (flood.ID || 'N/A') + "<br>" +
+                            "<b>Date:</b> " + (flood.Began || 'Unknown') + "<br>" +
+                            "<b>Dead:</b> " + (flood.Dead || 0) + "<br>" +
+                            "<b>Cause:</b> " + (flood.MainCause || 'N/A')
+                        );
+                    }
+                });
+            })
+            .catch(error => console.error('Error loading the JSON:', error));
+    </script>
+</body>
+</html>
