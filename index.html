@@ -69,7 +69,7 @@
         }
 
         // 3. Load Data
-        fetch('drc_floods.json')
+        fetch('data_package/drc_floods.json')
             .then(response => response.json())
             .then(data => {
                 data.forEach(flood => {
@@ -81,7 +81,7 @@
                 });
             });
 
-        fetch('drc_health_infrastructure.json')
+        fetch('data_package/drc_health_infrastructure.json')
             .then(response => response.json())
             .then(data => {
                 data.elements.forEach(site => {
@@ -96,7 +96,7 @@
                 });
             });
 
-        fetch('sites_at_risk.json')
+        fetch('data_package/sites_at_risk.json')
             .then(response => response.json())
             .then(data => {
                 data.elements.forEach(site => {
