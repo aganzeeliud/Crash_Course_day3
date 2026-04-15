@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DRC Health Facility Flood Risk Map</title>
+    <title>DRC Health Facility Flood Risk & Population Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 600px; width: 100%; }
@@ -13,13 +13,11 @@
         button:hover { background: #0056b3; }
         button.active { background: #dc3545; }
 
-        /* PULSING ANIMATION FOR RISK SITES */
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.5); opacity: 0.5; }
             100% { transform: scale(1); opacity: 1; }
         }
-
         .pulse-marker {
             animation: pulse 1.5s infinite ease-in-out;
             transform-origin: center;
@@ -27,7 +25,7 @@
     </style>
 </head>
 <body>
-    <h1>DRC Health Facilities: Flood Risk Analysis</h1>
+    <h1>DRC Health Facilities: Flood Risk & Population Density</h1>
     
     <div class="controls">
         <strong>Map Filters:</strong> 
@@ -41,20 +39,36 @@
 
     <script>
         var map = L.map('map').setView([-4.038, 21.758], 5);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+
+        // 1. Base Map (Light style so density shows up better)
+        var baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         }).addTo(map);
+
+        // 2. Population Density Layer (WorldPop 1km)
+        var popDensityLayer = L.tileLayer('https://worldpop.arcgis.com/arcgis/rest/services/WorldPop_Population_Density_1km/ImageServer/tile/{z}/{y}/{x}', {
+            attribution: 'Population Density &copy; WorldPop',
+            opacity: 0.6
+        });
 
         var floodLayer = L.layerGroup().addTo(map);
         var allHealthLayer = L.layerGroup().addTo(map);
         var riskLayer = L.layerGroup().addTo(map);
 
-        // Helper to create circle markers
+        // Add Layer Control
+        var overlays = {
+            "Population Density": popDensityLayer,
+            "Flood Events": floodLayer,
+            "All Health Infrastructure": allHealthLayer,
+            "At-Risk Sites": riskLayer
+        };
+        L.control.layers(null, overlays).addTo(map);
+
         function createMarker(lat, lng, options, popupText, layer) {
             return L.circleMarker([lat, lng], options).addTo(layer).bindPopup(popupText);
         }
 
-        // 1. Load All Floods
+        // 3. Load Data
         fetch('drc_floods.json')
             .then(response => response.json())
             .then(data => {
@@ -67,7 +81,6 @@
                 });
             });
 
-        // 2. Load All Health Sites
         fetch('drc_health_infrastructure.json')
             .then(response => response.json())
             .then(data => {
@@ -76,15 +89,13 @@
                     var lon = site.lon || (site.center ? site.center.lon : null);
                     if (lat && lon) {
                         var tags = site.tags || {};
-                        var popup = "<b>" + (tags.name || "Unnamed Site") + "</b><br>Type: " + tags.amenity;
                         createMarker(lat, lon, {
                             radius: 4, fillColor: "#888888", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.3
-                        }, popup, allHealthLayer);
+                        }, "<b>" + (tags.name || "Unnamed") + "</b>", allHealthLayer);
                     }
                 });
             });
 
-        // 3. Load At-Risk Sites with ANIMATION
         fetch('sites_at_risk.json')
             .then(response => response.json())
             .then(data => {
@@ -97,15 +108,8 @@
                                    "<b>Name:</b> " + (tags.name || "Unnamed") + "<br>" +
                                    "<b>Distance:</b> " + tags.distance_to_flood + " km";
                         
-                        // We add 'className: "pulse-marker"' to trigger the CSS animation
                         createMarker(lat, lon, {
-                            radius: 10, 
-                            fillColor: "#ff00ff", 
-                            color: "#000", 
-                            weight: 2, 
-                            opacity: 1, 
-                            fillOpacity: 1,
-                            className: "pulse-marker" 
+                            radius: 10, fillColor: "#ff00ff", color: "#000", weight: 2, opacity: 1, fillOpacity: 1, className: "pulse-marker" 
                         }, popup, riskLayer);
                     }
                 });
