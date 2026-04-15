@@ -1,54 +1,99 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DRC Flood Map</title>
-    <!-- 1. Leaflet CSS (The 'style' for our map) -->
+    <title>DRC Flood & Hospital Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 600px; width: 100%; }
-        body { font-family: Arial, sans-serif; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .legend { background: white; padding: 10px; line-height: 1.5; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>DRC Flood Archive Map</h1>
-    <p>This map shows flood locations in the Democratic Republic of the Congo.</p>
+    <h1>DRC Flood & Hospital Map</h1>
+    <p>This map shows flood locations (blue) and hospitals (red) in the Democratic Republic of the Congo.</p>
     
-    <!-- 2. The container for our map -->
     <div id="map"></div>
 
-    <!-- 3. Leaflet JS (The 'brains' of our map) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 4. Initialize the map centered on the DRC
+        // 1. Initialize the map
         var map = L.map('map').setView([-4.038, 21.758], 5);
 
-        // 5. Add a base layer (The background tiles)
+        // 2. Add background tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 6. Load the data (Replace 'drc_floods.json' with your GitHub RAW link later)
+        // 3. Define different marker styles
+        // Blue circle for Floods
+        function floodMarker(lat, lng, popupText) {
+            L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: "#3388ff",
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map).bindPopup(popupText);
+        }
+
+        // Red circle for Hospitals
+        function hospitalMarker(lat, lng, popupText) {
+            L.circleMarker([lat, lng], {
+                radius: 6,
+                fillColor: "#ff4444",
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.9
+            }).addTo(map).bindPopup(popupText);
+        }
+
+        // 4. Load Flood Data
         fetch('drc_floods.json')
             .then(response => response.json())
             .then(data => {
                 data.forEach(flood => {
-                    // Check if we have valid coordinates
                     if (flood.lat && flood.long) {
-                        // Create a marker for each flood
-                        var marker = L.marker([flood.lat, flood.long]).addTo(map);
-                        
-                        // Add a popup with info
-                        marker.bindPopup(
-                            "<b>ID:</b> " + (flood.ID || 'N/A') + "<br>" +
-                            "<b>Date:</b> " + (flood.Began || 'Unknown') + "<br>" +
-                            "<b>Dead:</b> " + (flood.Dead || 0) + "<br>" +
-                            "<b>Cause:</b> " + (flood.MainCause || 'N/A')
-                        );
+                        var popup = "<b>Flood Event</b><br>" +
+                                   "Date: " + (flood.Began || 'N/A') + "<br>" +
+                                   "Dead: " + (flood.Dead || 0);
+                        floodMarker(flood.lat, flood.long, popup);
                     }
                 });
-            })
-            .catch(error => console.error('Error loading the JSON:', error));
+            });
+
+        // 5. Load Hospital Data (from Overpass API result)
+        fetch('drc_hospitals.json')
+            .then(response => response.json())
+            .then(data => {
+                data.elements.forEach(hospital => {
+                    // Overpass returns lat/lon for nodes, and 'center' for ways/relations
+                    var lat = hospital.lat || (hospital.center ? hospital.center.lat : null);
+                    var lon = hospital.lon || (hospital.center ? hospital.center.lon : null);
+                    
+                    if (lat && lon) {
+                        var name = hospital.tags.name || "Unnamed Hospital";
+                        var type = hospital.tags.amenity || "Hospital";
+                        var popup = "<b>" + name + "</b><br>Type: " + type;
+                        hospitalMarker(lat, lon, popup);
+                    }
+                });
+            });
+
+        // 6. Add a simple legend
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<b>Legend</b><br>';
+            div.innerHTML += '<i style="background: #3388ff; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></i> Flood Event<br>';
+            div.innerHTML += '<i style="background: #ff4444; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></i> Hospital<br>';
+            return div;
+        };
+        legend.addTo(map);
+
     </script>
 </body>
 </html>
