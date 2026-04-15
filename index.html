@@ -45,11 +45,11 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         }).addTo(map);
 
-        // 2. Population Density Layer (WorldPop 1km)
+        // 2. Population Density Layer (WorldPop 1km) - ADDED TO MAP BY DEFAULT NOW
         var popDensityLayer = L.tileLayer('https://worldpop.arcgis.com/arcgis/rest/services/WorldPop_Population_Density_1km/ImageServer/tile/{z}/{y}/{x}', {
             attribution: 'Population Density &copy; WorldPop',
-            opacity: 0.6
-        });
+            opacity: 0.5
+        }).addTo(map);
 
         var floodLayer = L.layerGroup().addTo(map);
         var allHealthLayer = L.layerGroup().addTo(map);
@@ -57,10 +57,10 @@
 
         // Add Layer Control
         var overlays = {
-            "Population Density": popDensityLayer,
-            "Flood Events": floodLayer,
-            "All Health Infrastructure": allHealthLayer,
-            "At-Risk Sites": riskLayer
+            "Population Density (Heatmap)": popDensityLayer,
+            "Flood Events (Blue)": floodLayer,
+            "All Health Infrastructure (Grey)": allHealthLayer,
+            "At-Risk Sites (Pulsing Pink)": riskLayer
         };
         L.control.layers(null, overlays).addTo(map);
 
@@ -136,6 +136,9 @@
             div.innerHTML += '<i style="background: #ff00ff; border: 2px solid black;"></i> <b>Warning: At-Risk Site</b><br>';
             div.innerHTML += '<i style="background: #3388ff"></i> Recorded Flood<br>';
             div.innerHTML += '<i style="background: #888888"></i> Normal Health Site<br>';
+            div.innerHTML += '<hr>';
+            div.innerHTML += '<b>Population Density</b><br>';
+            div.innerHTML += '<small>(Yellow/Red = High Density)</small>';
             return div;
         };
         legend.addTo(map);
