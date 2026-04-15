@@ -1,103 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DRC Flood & Health Infrastructure Map</title>
+    <title>DRC Flood & Health Infrastructure Risk Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 600px; width: 100%; }
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .legend { background: white; padding: 10px; line-height: 1.5; border: 1px solid #ccc; border-radius: 5px; }
+        .legend { background: white; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
         .legend i { width: 10px; height: 10px; display: inline-block; border-radius: 50%; margin-right: 5px; }
     </style>
 </head>
 <body>
-    <h1>DRC Flood & Health Infrastructure Map</h1>
-    <p>This map shows flood locations and various health facilities (hospitals, clinics, pharmacies, etc.) in the DRC.</p>
+    <h1>DRC Flood Risk Map (1km Radius Analysis)</h1>
+    <p>This map identifies <b>19 health sites</b> located within 1km of recorded flood events.</p>
     
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Initialize the map
+        // 1. Initialize map
         var map = L.map('map').setView([-4.038, 21.758], 5);
 
-        // 2. Add background tiles
+        // 2. Add tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. Define marker styles
-        function getHealthColor(type) {
-            switch(type) {
-                case 'hospital': return "#ff0000"; // Red
-                case 'clinic': return "#ff8800";   // Orange
-                case 'pharmacy': return "#cc00ff"; // Purple
-                case 'doctors': return "#00cc00";  // Green
-                case 'health_post': return "#ffff00"; // Yellow
-                default: return "#888888";         // Grey
-            }
-        }
-
-        function createMarker(lat, lng, color, radius, popupText) {
+        function createMarker(lat, lng, color, radius, opacity, popupText) {
             return L.circleMarker([lat, lng], {
                 radius: radius,
                 fillColor: color,
                 color: "#000",
                 weight: 1,
                 opacity: 1,
-                fillOpacity: 0.8
+                fillOpacity: opacity
             }).addTo(map).bindPopup(popupText);
         }
 
-        // 4. Load Flood Data
+        // 3. Load All Floods (Blue)
         fetch('drc_floods.json')
             .then(response => response.json())
             .then(data => {
                 data.forEach(flood => {
                     if (flood.lat && flood.long) {
-                        var popup = "<b>Flood Event</b><br>" +
-                                   "Date: " + (flood.Began || 'N/A') + "<br>" +
-                                   "Dead: " + (flood.Dead || 0);
-                        createMarker(flood.lat, flood.long, "#3388ff", 8, popup);
+                        var popup = "<b>Flood Event</b><br>Date: " + (flood.Began || 'N/A');
+                        createMarker(flood.lat, flood.long, "#3388ff", 8, 0.4, popup);
                     }
                 });
             });
 
-        // 5. Load Comprehensive Health Infrastructure Data
+        // 4. Load General Health Sites (Small Grey circles)
         fetch('drc_health_infrastructure.json')
             .then(response => response.json())
             .then(data => {
                 data.elements.forEach(site => {
                     var lat = site.lat || (site.center ? site.center.lat : null);
                     var lon = site.lon || (site.center ? site.center.lon : null);
-                    
                     if (lat && lon) {
                         var tags = site.tags || {};
-                        var name = tags.name || "Unnamed Facility";
-                        var type = tags.amenity || "Health Facility";
-                        var color = getHealthColor(type);
-                        
-                        var popup = "<b>" + name + "</b><br>" +
-                                   "Type: " + type.replace('_', ' ') + "<br>" +
-                                   (tags['addr:city'] ? "City: " + tags['addr:city'] : "");
-                        
-                        createMarker(lat, lon, color, 5, popup);
+                        var popup = "<b>" + (tags.name || "Unnamed Site") + "</b><br>Type: " + tags.amenity;
+                        createMarker(lat, lon, "#888888", 3, 0.2, popup);
                     }
                 });
             });
 
-        // 6. Add a detailed legend
+        // 5. Load AT-RISK Health Sites (Highlight in Magenta/Pink)
+        fetch('sites_at_risk.json')
+            .then(response => response.json())
+            .then(data => {
+                data.elements.forEach(site => {
+                    var lat = site.lat || (site.center ? site.center.lat : null);
+                    var lon = site.lon || (site.center ? site.center.lon : null);
+                    if (lat && lon) {
+                        var tags = site.tags || {};
+                        var popup = "<b><span style='color:red'>⚠️ SITE AT RISK</span></b><br>" +
+                                   "<b>Name:</b> " + (tags.name || "Unnamed") + "<br>" +
+                                   "<b>Type:</b> " + tags.amenity + "<br>" +
+                                   "<b>Distance to Flood:</b> " + tags.distance_to_flood + " km<br>" +
+                                   "<b>Associated Event:</b> " + (tags.flood_event || "N/A");
+                        createMarker(lat, lon, "#ff00ff", 8, 1, popup);
+                    }
+                });
+            });
+
+        // 6. Legend
         var legend = L.control({position: 'bottomright'});
         legend.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<b>Legend</b><br>';
-            div.innerHTML += '<i style="background: #3388ff"></i> Flood Event<br>';
-            div.innerHTML += '<i style="background: #ff0000"></i> Hospital<br>';
-            div.innerHTML += '<i style="background: #ff8800"></i> Clinic<br>';
-            div.innerHTML += '<i style="background: #cc00ff"></i> Pharmacy<br>';
-            div.innerHTML += '<i style="background: #00cc00"></i> Doctors<br>';
-            div.innerHTML += '<i style="background: #ffff00"></i> Health Post<br>';
+            div.innerHTML += '<i style="background: #ff00ff"></i> <b>At-Risk Site (within 1km)</b><br>';
+            div.innerHTML += '<i style="background: #3388ff"></i> Recorded Flood<br>';
             div.innerHTML += '<i style="background: #888888"></i> Other Health Site<br>';
             return div;
         };
